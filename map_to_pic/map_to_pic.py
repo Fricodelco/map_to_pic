@@ -1,39 +1,47 @@
 import rclpy
 from rclpy.node import Node
-
-from std_msgs.msg import String
-
-
-class MinimalPublisher(Node):
-
-    def __init__(self):
-        super().__init__('minimal_publisher')
-        self.publisher_ = self.create_publisher(String, 'topic', 10)
-        timer_period = 0.5  # seconds
-        self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.i = 0
-
-    def timer_callback(self):
-        msg = String()
-        msg.data = 'Hello World: %d' % self.i
-        self.publisher_.publish(msg)
-        self.get_logger().info('Publishing: "%s"' % msg.data)
-        self.i += 1
-
-
+import threading
+from nav_msgs.msg import OccupancyGrid
+import cv2
+import numpy as np
+class MinimalSubscriber():
+    def __init__(self, node):
+        self.subscription = node.create_subscription(
+            OccupancyGrid,
+            'map',
+            self.map_callback,
+            10)
+        self.subscription  # prevent unused variable warning
+        self.img = None
+    def map_callback(self, map):
+        print(len(map.data))
+        # map_img = np.zeros(())
+        print(map.info.resolution)
+        print(map.info.height)
+        print(map.info.width)
+        blank_image = np.zeros((map.info.height, map.info.width,1), np.uint8)
+        for i in range(0, map.info.height):
+            for j in range(0, map.info.width):
+                blank_image[i][j] = map.data[i+j]
+        self.img = blank_image
 def main(args=None):
     rclpy.init(args=args)
-
-    minimal_publisher = MinimalPublisher()
-
-    rclpy.spin(minimal_publisher)
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    minimal_publisher.destroy_node()
-    rclpy.shutdown()
-
+    node = rclpy.create_node('map_to_pic')
+    thread = threading.Thread(target=rclpy.spin, args=(node, ), daemon=True)
+    thread.start()
+    rate = node.create_rate(10)
+    minimal_subscriber = MinimalSubscriber(node)
+    while rclpy.ok():
+        try:
+            if minimal_subscriber.img != None:
+                print(len(minimal_subscriber.img))
+                rate.sleep()
+        except KeyboardInterrupt:
+            rclpy.shutdown()
+            node.destroy_node()
+            thread.join()
+    
+    
 
 if __name__ == '__main__':
     main()
