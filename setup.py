@@ -20,7 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'map_to_pic=map_to_pic.map_to_pic:main'
+            'map_to_pic=map_to_pic.map_to_pic:main',
+            'lifecycle_caller=map_to_pic.lifecycle_caller:main',
+            'nav_action=map_to_pic.nav_action:main'
         ],
     },
 )
