@@ -12,31 +12,52 @@ class MapToPic(Node):
         self.subscription = self.create_subscription(OccupancyGrid,'map',self.map_callback,10)
         self.subscription = self.create_subscription(TFMessage,'tf_static',self.tf_callback,10)
         self.subscription  # prevent unused variable warning
-        self.img = None
+        self.map = None
         self.new_img = False
         self.tfBuffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tfBuffer, self)
-
+        self.map_resolution = 0
+        self.map_origin = None
+        self.robot_pose_img = [0,0,0]
     def tf_callback(self, tf):
         try:
             # trans = self.tfBuffer.lookup_transform('map', 'base_footprint', self.get_clock().now().to_msg())
             trans = self.tfBuffer.lookup_transform('map', 'base_footprint', tf.transforms[0].header.stamp)
-            print(trans)
+            translation = trans.transform.translation 
+            rotation = trans.transform.rotation
+            if self.map is not None:
+                delta_x = translation.x - self.map_origin.position.x
+                delta_y = translation.y - self.map_origin.position.y
+                # print(delta_x, delta_y)
+                self.robot_pose_img = [delta_x/self.map_resolution,
+                delta_y/self.map_resolution, 0]
+                print(self.robot_pose_img)
         except Exception as e:
             print(e)
     def map_callback(self, map):
-        blank_image = np.zeros((map.info.height, map.info.width,1), np.uint8)
+        blank_image = np.zeros((map.info.height, map.info.width,3), np.uint8)
         for i in range(0, map.info.height):
             for j in range(0, map.info.width):
                 k = j + (map.info.height - i - 1)*map.info.width
                 if map.data[int(k)] == 0:
-                    blank_image[i][j] = 254
+                    blank_image[i][j][0] = 254
+                    blank_image[i][j][1] = 254
+                    blank_image[i][j][2] = 254
                 elif map.data[int(k)] == 100:
-                    blank_image[i][j] = 0
+                    blank_image[i][j][0] = 0
+                    blank_image[i][j][1] = 0
+                    blank_image[i][j][2] = 0
                 else:
-                    blank_image[i][j] = 205
-        self.img = blank_image
+                    blank_image[i][j][0] = 200
+                    blank_image[i][j][1] = 200
+                    blank_image[i][j][2] = 200
+        self.map_origin = map.info.origin
+        # print(self.map_origin)
+        self.map_resolution = map.info.resolution
+        self.map = blank_image
         self.new_img = True
+    def get_image(self):
+        a=1
 def main(args=None):
     rclpy.init(args=args)
     map_to_pic = MapToPic()
@@ -46,7 +67,7 @@ def main(args=None):
     while rclpy.ok():
         try:
             # print(type(minimal_subscriber.img))
-            if map_to_pic.img is not None:
+            if map_to_pic.map is not None:
                 # print(len(minimal_subscriber.img))
                 # if minimal_subscriber.new_img == True:
                 #     # print(minimal_subscriber.img)
