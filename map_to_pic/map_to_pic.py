@@ -67,16 +67,19 @@ class MapToPic(Node):
         self.map_resolution = map.info.resolution
         self.map_ = blank_image
     def get_map(self):
-        image_ = copy(self.map_)
-        scale = 4
-        width = int(image_.shape[1] * scale)
-        height = int(image_.shape[0] * scale)
-        dim = (width, height)
-        image_ = cv2.resize(image_, dim, interpolation = cv2.INTER_AREA)
-        cv2.circle(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale), int(self.robot_radius/self.map_resolution)*scale, (255, 0, 0), 1)
-        cv2.line(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale),
-        (int(self.robot_pose_img[2])*scale, int(self.robot_pose_img[3])*scale),(255,0,0),1)
-        return image_
+        if self.map_ is not None:
+            image_ = copy(self.map_)
+            scale = 4
+            width = int(image_.shape[1] * scale)
+            height = int(image_.shape[0] * scale)
+            dim = (width, height)
+            image_ = cv2.resize(image_, dim, interpolation = cv2.INTER_AREA)
+            cv2.circle(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale), int(self.robot_radius/self.map_resolution)*scale, (255, 0, 0), 1)
+            cv2.line(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale),
+            (int(self.robot_pose_img[2])*scale, int(self.robot_pose_img[3])*scale),(255,0,0),1)
+            return image_
+        else:
+            return False
 def main(args=None):
     rclpy.init(args=args)
     map_to_pic = MapToPic(0.3)
