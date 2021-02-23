@@ -22,7 +22,8 @@ setup(
         'console_scripts': [
             'map_to_pic=map_to_pic.map_to_pic:main',
             'lifecycle_caller=map_to_pic.lifecycle_caller:main',
-            'nav_action=map_to_pic.nav_action:main'
+            'nav_action=map_to_pic.nav_action:main',
+            'run_sh=map_to_pic.run_sh:main',
         ],
     },
 )
