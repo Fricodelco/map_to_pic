@@ -27,7 +27,7 @@ class run_prog():
         # for proc in process.children(recursive=True):
         #     proc.kill()
         # process.kill()
-        subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=self.shellscript.pid))
+        subprocess.Popen("KILL /F /PID {pid} /T".format(pid=self.shellscript.pid))
         # os.killpg(os.getpgid(self.shellscript.pid), signal.SIGTERM)
 def save_map():
     dir_path = os.path.dirname(os.path.realpath(__file__))
