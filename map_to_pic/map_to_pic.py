@@ -7,7 +7,7 @@ import numpy as np
 import tf2_ros
 from tf2_msgs.msg import TFMessage
 from copy import copy
-from math import asin, sin, cos, pi
+from math import asin, sin, cos, pi, atan2
 class MapToPic(Node):
     def __init__(self, robot_radius):
         super().__init__('map_to_pic')
@@ -19,30 +19,40 @@ class MapToPic(Node):
         self.tfBuffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tfBuffer, self)
         self.map_resolution = 0
-        self.map_origin = None
+        self.map_origin_x = 0
+        self.map_origin_y = 0
         self.robot_pose_img = [0,0,0,0]
         self.robot_radius = robot_radius
         self.tf_time = self.get_clock().now().to_msg()
+        self.skip_tf = 0
     def tf_callback(self, tf):
-        self.tf_time = tf.transforms[0].header.stamp
-        self.tf_time.sec -=1
+        if self.skip_tf == 50:
+            self.tf_time = tf.transforms[0].header.stamp
+            # self.tf_time.sec -
+            self.skip_tf = 0
+        else:
+            self.skip_tf+=1
     def timer_callback(self):
         try:
-            # trans = self.tfBuffer.lookup_transform('map', 'base_footprint', self.get_clock().now().to_msg())
+            # trans = self.tfBuffer.lookup_transform('map', 'base_link', self.get_clock().now().to_msg())
             trans = self.tfBuffer.lookup_transform('map', 'base_link', self.tf_time)
             translation = trans.transform.translation 
-            rotation = trans.transform.rotation
-            angle = asin(2*rotation.x*rotation.y+2*rotation.z*rotation.w)
-            # print(self.map_origin.position.x, self.map_origin.position.y)
+            q = trans.transform.rotation
+            siny_cosp = 2 * (q.w * q.z + q.x * q.y)
+            cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
+            angle = atan2(siny_cosp, cosy_cosp);
+
+            # # angle = asin(2*rotation.x*rotation.y+2*rotation.z*rotation.w)
+            # print(self.map_origin_x, self.map_origin_y)
             # print(translation.x, translation.y, "trans")
             if self.map_ is not None:
-                delta_x = translation.x - self.map_origin.position.x
-                delta_y = -translation.y - self.map_origin.position.y
+                delta_x = translation.x + self.map_origin_x
+                delta_y = -translation.y + self.map_origin_y
                 # print(delta_x, delta_y)
                 self.robot_pose_img = [delta_x/self.map_resolution,
                 delta_y/self.map_resolution, 
-                delta_x/self.map_resolution + cos(pi - angle)*self.robot_radius/self.map_resolution*1.5,
-                delta_y/self.map_resolution + sin(pi - angle)*self.robot_radius/self.map_resolution*1.5]
+                delta_x/self.map_resolution + sin(angle+pi/2)*self.robot_radius/self.map_resolution*1.5,
+                delta_y/self.map_resolution + cos(angle+pi/2)*self.robot_radius/self.map_resolution*1.5]
 
         except Exception as e:
             print(e)
@@ -63,7 +73,9 @@ class MapToPic(Node):
                     blank_image[i][j][0] = 200
                     blank_image[i][j][1] = 200
                     blank_image[i][j][2] = 200
-        self.map_origin = map.info.origin
+        # self.map_origin = map.info.origin
+        self.map_origin_x = -map.info.origin.position.x
+        self.map_origin_y = map.info.height*map.info.resolution+map.info.origin.position.y
         self.map_resolution = map.info.resolution
         self.map_ = blank_image
     def get_map(self):
