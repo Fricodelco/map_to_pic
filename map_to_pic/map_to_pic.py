@@ -7,14 +7,16 @@ import numpy as np
 import tf2_ros
 from tf2_msgs.msg import TFMessage
 from copy import copy
-from math import asin, sin, cos, pi, atan2
+from math import asin, sin, cos, pi, atan2, isnan
+from sensor_msgs.msg import LaserScan
 class MapToPic(Node):
     def __init__(self, robot_radius):
         super().__init__('map_to_pic')
-        self.subscription = self.create_subscription(OccupancyGrid,'map',self.map_callback,10)
-        self.subscription = self.create_subscription(TFMessage,'tf',self.tf_callback,10)
-        self.create_timer(0.1, self.timer_callback)
-        self.subscription  # prevent unused variable warning
+        self.subscription_1 = self.create_subscription(OccupancyGrid,'map',self.map_callback,10)
+        self.subscription_2 = self.create_subscription(TFMessage,'tf',self.tf_callback,10)
+        self.subscription_3 = self.create_subscription(LaserScan,'scan_1',self.scan_callback,1)
+        self.create_timer(0.03, self.timer_callback)
+        # self.subscription  # prevent unused variable warning
         self.map_ = None
         self.tfBuffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tfBuffer, self)
@@ -25,6 +27,20 @@ class MapToPic(Node):
         self.robot_radius = robot_radius
         self.tf_time = self.get_clock().now().to_msg()
         self.skip_tf = 0
+        self.scan_buffer = [0]*100
+        self.scan_angles = [0]*100
+        self.robot_angle = 0
+    def scan_callback(self, data):
+        increment = int(len(data.ranges)/len(self.scan_buffer))                
+        # print(increment)
+        j = 0
+        # print(data.angle_min, data.angle_max)
+        for i in range(0, len(self.scan_buffer)*increment, increment):
+            self.scan_buffer[j] = data.ranges[i]
+            self.scan_angles[j] = i*data.angle_increment + data.angle_min
+            # print(j,i)
+            # print(data.ranges[i], i*data.angle_increment)
+            j+=1
     def tf_callback(self, tf):
         if self.skip_tf == 50:
             self.tf_time = tf.transforms[0].header.stamp
@@ -40,7 +56,7 @@ class MapToPic(Node):
             q = trans.transform.rotation
             siny_cosp = 2 * (q.w * q.z + q.x * q.y)
             cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-            angle = atan2(siny_cosp, cosy_cosp);
+            self.robot_angle = atan2(siny_cosp, cosy_cosp)+pi/2
 
             # # angle = asin(2*rotation.x*rotation.y+2*rotation.z*rotation.w)
             # print(self.map_origin_x, self.map_origin_y)
@@ -51,8 +67,8 @@ class MapToPic(Node):
                 # print(delta_x, delta_y)
                 self.robot_pose_img = [delta_x/self.map_resolution,
                 delta_y/self.map_resolution, 
-                delta_x/self.map_resolution + sin(angle+pi/2)*self.robot_radius/self.map_resolution*1.5,
-                delta_y/self.map_resolution + cos(angle+pi/2)*self.robot_radius/self.map_resolution*1.5]
+                delta_x/self.map_resolution + sin(self.robot_angle)*self.robot_radius/self.map_resolution*1.5,
+                delta_y/self.map_resolution + cos(self.robot_angle)*self.robot_radius/self.map_resolution*1.5]
 
         except Exception as e:
             print(e)
@@ -86,6 +102,12 @@ class MapToPic(Node):
             height = int(image_.shape[0] * scale)
             dim = (width, height)
             image_ = cv2.resize(image_, dim, interpolation = cv2.INTER_AREA)
+            for i in range(0, len(self.scan_buffer)-1,1):
+                if isnan(self.scan_buffer[i]) == False:
+                    # print(self.scan_buffer[i])
+                    position_x = self.robot_pose_img[0]+sin(self.robot_angle+self.scan_angles[i])*self.scan_buffer[i]/self.map_resolution
+                    position_y = self.robot_pose_img[1]+cos(self.robot_angle+self.scan_angles[i])*self.scan_buffer[i]/self.map_resolution
+                    cv2.circle(image_, (int(position_x)*scale, int(position_y)*scale), 1, (0, 0, 255), 1)
             cv2.circle(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale), int(self.robot_radius/self.map_resolution)*scale, (255, 0, 0), 1)
             cv2.line(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale),
             (int(self.robot_pose_img[2])*scale, int(self.robot_pose_img[3])*scale),(255,0,0),1)
@@ -97,7 +119,7 @@ def main(args=None):
     map_to_pic = MapToPic(0.3)
     thread = threading.Thread(target=rclpy.spin, args=(map_to_pic, ), daemon=True)
     thread.start()
-    rate = map_to_pic.create_rate(10)
+    rate = map_to_pic.create_rate(30)
     while rclpy.ok():
         try:
             # print(type(minimal_subscriber.img))
