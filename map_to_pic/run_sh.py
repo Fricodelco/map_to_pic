@@ -40,17 +40,9 @@ def save_map():
     # os.system('. '+dir_path+'run_map_server.sh')
     # print(p)
 def main():
-    sub = run_prog()
-    sub.run()
-    for i in range(0,5,1):
-        print(i)
-        sleep(0.5)
-    sub.stop()
-    sub = run_prog()
-    sub.run()
-    for i in range(0,5,1):
-        print(i)
-        sleep(0.5)
-    sub.stop()
+    # sub = run_prog()
+    # sub.run()
+    # sub.stop()
+    save_map()
 if __name__ == '__main__':
     main()
