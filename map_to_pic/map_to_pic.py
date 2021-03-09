@@ -15,7 +15,7 @@ class MapToPic(Node):
         self.subscription_1 = self.create_subscription(OccupancyGrid,'map',self.map_callback,10)
         self.subscription_2 = self.create_subscription(TFMessage,'tf',self.tf_callback,10)
         self.subscription_3 = self.create_subscription(LaserScan,'scan_1',self.scan_callback,1)
-        self.create_timer(0.03, self.timer_callback)
+        self.create_timer(0.5, self.timer_callback)
         # self.subscription  # prevent unused variable warning
         self.map_ = None
         self.tfBuffer = tf2_ros.Buffer()
@@ -32,25 +32,26 @@ class MapToPic(Node):
         self.robot_angle = 0
     def scan_callback(self, data):
         increment = int(len(data.ranges)/len(self.scan_buffer))                
-        # print(increment)
         j = 0
-        # print(data.angle_min, data.angle_max)
         for i in range(0, len(self.scan_buffer)*increment, increment):
             self.scan_buffer[j] = data.ranges[i]
             self.scan_angles[j] = i*data.angle_increment + data.angle_min
-            # print(j,i)
-            # print(data.ranges[i], i*data.angle_increment)
             j+=1
     def tf_callback(self, tf):
-        if self.skip_tf == 50:
+        # if self.skip_tf == 50:
+            # self.tf_time = tf.transforms[0].header.stamp
+            # self.tf_time.sec -= 1
+            # self.skip_tf = 0
+        # else:
+            # self.skip_tf+=1
+        if tf.transforms[0].child_frame_id == 'base_link':
             self.tf_time = tf.transforms[0].header.stamp
-            # self.tf_time.sec -
-            self.skip_tf = 0
-        else:
-            self.skip_tf+=1
     def timer_callback(self):
         try:
-            # trans = self.tfBuffer.lookup_transform('map', 'base_link', self.get_clock().now().to_msg())
+            # print(self.get_clock().now().to_msg())
+            # now = self.get_clock().now().to_msg()
+            # now.nanosec -= 10000000
+            # trans = self.tfBuffer.lookup_transform('map', 'base_link', now)
             trans = self.tfBuffer.lookup_transform('map', 'base_link', self.tf_time)
             translation = trans.transform.translation 
             q = trans.transform.rotation
@@ -69,7 +70,6 @@ class MapToPic(Node):
                 delta_y/self.map_resolution, 
                 delta_x/self.map_resolution + sin(self.robot_angle)*self.robot_radius/self.map_resolution*1.5,
                 delta_y/self.map_resolution + cos(self.robot_angle)*self.robot_radius/self.map_resolution*1.5]
-
         except Exception as e:
             print(e)
     def map_callback(self, map):
@@ -97,7 +97,7 @@ class MapToPic(Node):
     def get_map(self):
         if self.map_ is not None:
             image_ = copy(self.map_)
-            scale = 4
+            scale = 1
             width = int(image_.shape[1] * scale)
             height = int(image_.shape[0] * scale)
             dim = (width, height)
@@ -111,6 +111,9 @@ class MapToPic(Node):
             cv2.circle(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale), int(self.robot_radius/self.map_resolution)*scale, (255, 0, 0), 1)
             cv2.line(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale),
             (int(self.robot_pose_img[2])*scale, int(self.robot_pose_img[3])*scale),(255,0,0),1)
+            # msg = Image()
+            # msg = self.bridge.cv2_to_imgmsg(image_, "bgr8")
+            # self.publisher_.publish(msg)
             return image_
         else:
             return False
@@ -119,7 +122,7 @@ def main(args=None):
     map_to_pic = MapToPic(0.3)
     thread = threading.Thread(target=rclpy.spin, args=(map_to_pic, ), daemon=True)
     thread.start()
-    rate = map_to_pic.create_rate(30)
+    rate = map_to_pic.create_rate(2)
     while rclpy.ok():
         try:
             # print(type(minimal_subscriber.img))
@@ -133,7 +136,6 @@ def main(args=None):
                 # height = int(img.shape[0] * scale_percent / 100)
                 # dim = (width, height)
                 # resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
-                
                 cv2.imshow('img',img)
                 cv2.waitKey(1)
                 rate.sleep()
