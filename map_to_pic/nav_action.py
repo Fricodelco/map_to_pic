@@ -9,8 +9,8 @@ import threading
 from geometry_msgs.msg import PoseWithCovarianceStamped
 
 class ToPoseClient(Node):
-    def __init__(self):
-        super().__init__('navigate_to_pose_action_client')
+    def __init__(self, name):
+        super().__init__('navigate_to_pose_action_client'+"_"+name)
         self._action_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
         self.initialpose = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", 1)
         self.move_status = False
