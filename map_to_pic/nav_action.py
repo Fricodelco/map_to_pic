@@ -2,7 +2,7 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from nav2_msgs.action import NavigateToPose
-from math import sin, cos
+from math import sin, cos, atan2, pi
 import numpy as np
 import json
 import threading
@@ -17,7 +17,9 @@ class ToPoseClient(Node):
         self.feedback = {"state": "stay", 
         "number_of_recoveries": 0,
         "distance_remaining": 0,
-        "navigation_time": 0}
+        "navigation_time": 0,
+        "target": {'x':0, "y":0, "angle":0},
+        "current_pose": {'x':0, "y":0, "angle":0}}
         self.target = [0,0,0]
                     #states: moving to goal, goal reached, goal cant be reached
     def euler_to_quaternion(self, yaw):
@@ -89,6 +91,14 @@ class ToPoseClient(Node):
         self.feedback["number_of_recoveries"] = feedback.number_of_recoveries
         self.feedback["distance_remaining"] = feedback.distance_remaining
         self.feedback["navigation_time"] = feedback.navigation_time.sec
+        self.feedback["target"] = {"x":round(self.target[0], 2), "y":round(self.target[1], 2), "angle":round(self.target[2], 2)}
+        x = feedback.current_pose.pose.position.x
+        y = feedback.current_pose.pose.position.y
+        q = feedback.current_pose.pose.orientation
+        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
+        alpha = atan2(siny_cosp, cosy_cosp)+pi/2
+        self.feedback["current_pose"] = {"x":round(x,2), "y":round(y,2), "angle":round(alpha,2)}
         # self.get_logger().info('Received feedback: {0}'.format(feedback))
     def get_feedback(self):
         return self.feedback
