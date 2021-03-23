@@ -10,6 +10,7 @@ from copy import copy
 from math import asin, sin, cos, pi, atan2, isnan
 from sensor_msgs.msg import LaserScan
 import subprocess
+from nav_msgs.msg import Path
 class MapToPic(Node):
     def __init__(self, robot_radius):
         super().__init__('map_to_pic')
@@ -17,6 +18,7 @@ class MapToPic(Node):
         self.subscription_2 = self.create_subscription(TFMessage,'tf',self.tf_callback,10)
         self.subscription_3 = self.create_subscription(LaserScan,'scan_1',self.scan_callback,1)
         self.subscription_4 = self.create_subscription(OccupancyGrid,'keepout_filter_mask',self.keepout_callback,10)
+        self.subscription_5 = self.create_subscription(Path,'plan',self.plan_callback,10)
         self.create_timer(0.5, self.timer_callback)
         # self.subscription  # prevent unused variable warning
         self.map_ = None
@@ -33,6 +35,18 @@ class MapToPic(Node):
         self.scan_buffer = [0]*100
         self.scan_angles = [0]*100
         self.robot_angle = 0
+        self.plan = []
+        
+    def plan_callback(self, plan):
+        try:
+            self.plan = []
+            for pose in plan.poses:
+                x = (pose.pose.position.x + self.map_origin_x)/self.map_resolution
+                y = (-pose.pose.position.y + self.map_origin_y)/self.map_resolution
+                self.plan.append([x,y])
+        
+        except Exception as e:
+            print(e)
     def scan_callback(self, data):
         increment = int(len(data.ranges)/len(self.scan_buffer))                
         j = 0
@@ -120,29 +134,13 @@ class MapToPic(Node):
         self.map_resolution = map.info.resolution
         self.keepout_map = blank_image
     def get_map(self):
+        image_ = None
         if self.keepout_map is not None:
             image_ = copy(self.keepout_map)
-            scale = 1
-            width = int(image_.shape[1] * scale)
-            height = int(image_.shape[0] * scale)
-            dim = (width, height)
-            image_ = cv2.resize(image_, dim, interpolation = cv2.INTER_AREA)
-            for i in range(0, len(self.scan_buffer)-1,1):
-                if isnan(self.scan_buffer[i]) == False:
-                    # print(self.scan_buffer[i])
-                    position_x = self.robot_pose_img[0]+sin(self.robot_angle+self.scan_angles[i])*self.scan_buffer[i]/self.map_resolution
-                    position_y = self.robot_pose_img[1]+cos(self.robot_angle+self.scan_angles[i])*self.scan_buffer[i]/self.map_resolution
-                    cv2.circle(image_, (int(position_x)*scale, int(position_y)*scale), 1, (0, 0, 255), 1)
-            cv2.circle(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale), int(self.robot_radius/self.map_resolution)*scale, (255, 0, 0), 1)
-            cv2.line(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale),
-            (int(self.robot_pose_img[2])*scale, int(self.robot_pose_img[3])*scale),(255,0,0),1)
-            # msg = Image()
-            # msg = self.bridge.cv2_to_imgmsg(image_, "bgr8")
-            # self.publisher_.publish(msg)
-            return image_
         elif self.map_ is not None:
             image_ = copy(self.map_)
-            scale = 1
+        if image_ is not None:
+            scale = 5
             width = int(image_.shape[1] * scale)
             height = int(image_.shape[0] * scale)
             dim = (width, height)
@@ -153,6 +151,8 @@ class MapToPic(Node):
                     position_x = self.robot_pose_img[0]+sin(self.robot_angle+self.scan_angles[i])*self.scan_buffer[i]/self.map_resolution
                     position_y = self.robot_pose_img[1]+cos(self.robot_angle+self.scan_angles[i])*self.scan_buffer[i]/self.map_resolution
                     cv2.circle(image_, (int(position_x)*scale, int(position_y)*scale), 1, (0, 0, 255), 1)
+            for pose in self.plan:
+                cv2.circle(image_, (int(pose[0]*scale), int(pose[1]*scale)), 1, (255,0,0),1)
             cv2.circle(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale), int(self.robot_radius/self.map_resolution)*scale, (255, 0, 0), 1)
             cv2.line(image_, (int(self.robot_pose_img[0])*scale, int(self.robot_pose_img[1])*scale),
             (int(self.robot_pose_img[2])*scale, int(self.robot_pose_img[3])*scale),(255,0,0),1)
