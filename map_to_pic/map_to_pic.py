@@ -61,7 +61,7 @@ class MapToPic(Node):
             # self.skip_tf = 0
         # else:
             # self.skip_tf+=1
-        if tf.transforms[0].child_frame_id == 'base_link':
+        if tf.transforms[0].child_frame_id == 'base_footprint':
             self.tf_time = tf.transforms[0].header.stamp
     def timer_callback(self):
         try:
@@ -69,7 +69,7 @@ class MapToPic(Node):
             # now = self.get_clock().now().to_msg()
             # now.nanosec -= 10000000
             # trans = self.tfBuffer.lookup_transform('map', 'base_link', now)
-            trans = self.tfBuffer.lookup_transform('map', 'base_link', self.tf_time)
+            trans = self.tfBuffer.lookup_transform('map', 'base_footprint', self.tf_time)
             translation = trans.transform.translation 
             q = trans.transform.rotation
             siny_cosp = 2 * (q.w * q.z + q.x * q.y)
