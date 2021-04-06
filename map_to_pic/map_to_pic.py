@@ -11,13 +11,13 @@ from math import asin, sin, cos, pi, atan2, isnan
 from sensor_msgs.msg import LaserScan
 import subprocess
 from nav_msgs.msg import Path
+from rclpy.qos import ReliabilityPolicy, QoSProfile
 class MapToPic(Node):
     def __init__(self, robot_radius):
         super().__init__('map_to_pic')
         self.subscription_1 = self.create_subscription(OccupancyGrid,'map',self.map_callback,10)
-        self.subscription_2 = self.create_subscription(TFMessage,'tf',self.tf_callback,10)
-        self.subscription_3 = self.create_subscription(LaserScan,'scan_1',self.scan_callback,1)
-        self.subscription_4 = self.create_subscription(OccupancyGrid,'keepout_filter_mask',self.keepout_callback,10)
+        #self.subscription_2 = self.create_subscription(TFMessage,'tf',self.tf_callback,10)
+        self.subscription_3 = self.create_subscription(LaserScan,'scan',self.sc_callback, QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT))
         self.subscription_5 = self.create_subscription(Path,'plan',self.plan_callback,10)
         self.create_timer(0.5, self.timer_callback)
         # self.subscription  # prevent unused variable warning
@@ -47,7 +47,7 @@ class MapToPic(Node):
         
         except Exception as e:
             print(e)
-    def scan_callback(self, data):
+    def sc_callback(self, data):
         increment = int(len(data.ranges)/len(self.scan_buffer))                
         j = 0
         for i in range(0, len(self.scan_buffer)*increment, increment):
@@ -66,10 +66,11 @@ class MapToPic(Node):
     def timer_callback(self):
         try:
             # print(self.get_clock().now().to_msg())
-            # now = self.get_clock().now().to_msg()
-            # now.nanosec -= 10000000
+            now = self.get_clock().now().to_msg()
+            now.sec -= 1
+            #now.nanosec -= 10000000
             # trans = self.tfBuffer.lookup_transform('map', 'base_link', now)
-            trans = self.tfBuffer.lookup_transform('map', 'base_footprint', self.tf_time)
+            trans = self.tfBuffer.lookup_transform('map', 'base_footprint', now)
             translation = trans.transform.translation 
             q = trans.transform.rotation
             siny_cosp = 2 * (q.w * q.z + q.x * q.y)
@@ -89,7 +90,7 @@ class MapToPic(Node):
                 delta_y/self.map_resolution + cos(self.robot_angle)*self.robot_radius/self.map_resolution*1.5]
         except Exception as e:
             print(e)
-    def map_callback(self, map):
+    def map_callback(self, map):      
         blank_image = np.zeros((map.info.height, map.info.width,3), np.uint8)
         for i in range(0, map.info.height):
             for j in range(0, map.info.width):
@@ -131,6 +132,7 @@ class MapToPic(Node):
         # self.map_origin = map.info.origin
         self.map_origin_x = -map.info.origin.position.x # tf map in glonal map px
         self.map_origin_y = map.info.height*map.info.resolution+map.info.origin.position.y
+        print(self.map_origin_x, self.map_origin.y)
         self.map_resolution = map.info.resolution
         self.keepout_map = blank_image
     def get_map(self):
@@ -140,7 +142,7 @@ class MapToPic(Node):
         elif self.map_ is not None:
             image_ = copy(self.map_)
         if image_ is not None:
-            scale = 5
+            scale = 1
             width = int(image_.shape[1] * scale)
             height = int(image_.shape[0] * scale)
             dim = (width, height)
