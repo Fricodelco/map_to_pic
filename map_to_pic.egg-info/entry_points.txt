@@ -1,0 +1,4 @@
+[console_scripts]
+map_to_pic = map_to_pic.map_to_pic:main
+nav_action = map_to_pic.nav_action:main
+
